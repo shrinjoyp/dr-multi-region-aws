@@ -1,0 +1,44 @@
+name: Terraform
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: AWS Auth (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ vars.PRIMARY_REGION || 'us-east-1' }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Format
+        run: terraform fmt -recursive -check
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform Apply (manual)
+        if: github.event_name == 'workflow_dispatch'
+        run: terraform apply -input=false tfplan
